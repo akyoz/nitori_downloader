@@ -14,8 +14,26 @@ def login():
     password = os.getenv("NITORI_PASSWORD")
 
     if not email or not password:
-        print("ご主人様、.envファイルにNITORI_USERNAMEとNITORI_PASSWORDを設定してくださいね！")
-        return None
+        print("ご主人様、.envファイルが見つからないか、設定が不完全です。\n(.env.sampleをコピーして.envファイルを作成・編集することもできます)")
+        choice = input("今すぐ初期設定を行いますか？ (y/n): ").lower()
+        if choice == 'y':
+            email = input("NITORIのメールアドレスを入力してください: ")
+            password = input("NITORIのパスワードを入力してください: ")
+            download_dir = input("ダウンロード先のフォルダパスを入力してください (デフォルトは 'downloads'): ")
+            if not download_dir:
+                download_dir = "downloads"
+
+            with open('.env', 'w', encoding='utf-8') as f:
+                f.write(f'NITORI_USERNAME="{email}"\n')
+                f.write(f'NITORI_PASSWORD="{password}"\n')
+                f.write(f'DOWNLOAD_DIR="{download_dir}"\n')
+
+            print(".envファイルを作成し、設定を保存しました。ログインを続けます。")
+            # .envファイルが作成されたので、再度読み込む
+            load_dotenv()
+        else:
+            print("設定がキャンセルされました。またね、ご主人様！")
+            return None
 
     api_key = "AIzaSyDcipyBAbP8FkkMGKYFT80CmlIVzuJTINU"
     auth_endpoint = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
