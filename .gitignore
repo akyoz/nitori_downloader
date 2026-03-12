@@ -2,4 +2,23 @@
 .env
 downloads/
 downloads/*
+<<<<<<< HEAD
 session.json
+=======
+.venv/
+.venv/*
+__pycache__/
+__pycache__/*
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+*.bak
+*.tmp
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+>>>>>>> 1676986c70d110d1b5d4a8f9e472e5fd510d4953
