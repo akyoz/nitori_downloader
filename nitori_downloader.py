@@ -131,12 +131,6 @@ def login():
     password = os.getenv("NITORI_PASSWORD")
 
     if not email or not password:
-<<<<<<< HEAD
-        print("ログイン情報が足りないみたい… GUI出すね！✨")
-        email, password = get_credentials_via_gui()
-        if not email or not password:
-            print("入力キャンセルされちゃった。また気が向いたときに呼んでね！👋")
-=======
         print("ご主人様、.envファイルが見つからないか、設定が不完全です。\n(.env.sampleをコピーして.envファイルを作成・編集することもできます)")
         choice = input("今すぐ初期設定を行いますか？ (y/n): ").lower()
         if choice == 'y':
@@ -156,7 +150,6 @@ def login():
             load_dotenv()
         else:
             print("設定がキャンセルされました。またね、ご主人様！")
->>>>>>> 1676986c70d110d1b5d4a8f9e472e5fd510d4953
             return None
 
     # 3. 実際のAPIにログインしにいく
