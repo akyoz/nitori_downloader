@@ -1,24 +1,29 @@
-# Ignore environment variables file
+# 🎀 基本の設定
 .env
-downloads/
-downloads/*
-<<<<<<< HEAD
-session.json
-=======
+.env.sample
+__pycache__/
+*.py[cod]
+*$py.class
 .venv/
 .venv/*
-__pycache__/
-__pycache__/*
-*.pyc
-*.pyo
-*.pyd
-*.log
-*.sqlite3
-*.db
-*.bak
-*.tmp
+venv/
+venv/*
+
+# 📂 お宝（ダウンロード画像）
+downloads/
+downloads/*
+
+# 🛡️ 秘匿情報（絶対に公開禁止！）
+session.json
+s-nitori.com.har
+*.har
+*.json_debug
+api_success_headers.json
+
+# 📑 OS・エディタ関連
+.vscode/
+.idea/
 *.swp
 *.swo
 *.DS_Store
 Thumbs.db
->>>>>>> 1676986c70d110d1b5d4a8f9e472e5fd510d4953

@@ -1,311 +1,176 @@
 import os
-import requests
-from dotenv import load_dotenv
-from bs4 import BeautifulSoup
 import json
+import requests
 import re
 import time
-from urllib.parse import urljoin
-import tkinter as tk
-from tkinter import messagebox
+from dotenv import load_dotenv
 
-SESSION_FILE = "session.json"
+# .envファイルを読み込むよ
+load_dotenv()
 
-def save_session(id_token):
-    """取得したトークン（通行証）をファイルに保存するよっ！✨"""
-    try:
-        with open(SESSION_FILE, "w", encoding="utf-8") as f:
-            json.dump({"id_token": id_token, "saved_at": time.time()}, f)
-        print("✨ セッション情報を保存したよ！しばらくはパスワードなしでいけるはず！")
-    except Exception as e:
-        print(f"⚠️ セッションの保存に失敗しちゃった…: {e}")
-
-def load_session():
-    """保存されてるトークンがあれば読み込むよ！✨"""
-    if os.path.exists(SESSION_FILE):
-        try:
-            with open(SESSION_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # 一旦、有無だけ確認して返すよ（有効チェックはこの後やる！）
-                return data.get("id_token")
-        except:
-            pass
-    return None
-
-def is_token_valid(id_token):
-    """その通行証（トークン）がまだ使えるか、お試しでチェックしてみるよ！✨"""
-    test_url = "https://s-nitori.com/gallery/pictures?page=1"
-    headers = {"Authorization": f"Bearer {id_token}"}
-    try:
-        # 実際にページを取得してみて、200 OKが返るか見るよ
-        response = requests.get(test_url, headers=headers, timeout=5)
-        return response.status_code == 200
-    except:
-        return False
-
-def get_credentials_via_gui():
-    """GUIでログイン情報を取得するよっ！✨"""
-    root = tk.Tk()
-    root.withdraw()
-
-    dialog = tk.Toplevel(root)
-    dialog.title("💕 ログイン情報入力 - アンティにお任せ！ 💕")
-    dialog.geometry("450x350")
-    
-    # 画面中央に配置
-    window_width = 450
-    window_height = 350
-    screen_width = dialog.winfo_screenwidth()
-    screen_height = dialog.winfo_screenheight()
-    center_x = int(screen_width/2 - window_width / 2)
-    center_y = int(screen_height/2 - window_height / 2)
-    dialog.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
-
-    bg_color = "#fff5f8" # ゆめかわピンク
-    dialog.configure(bg=bg_color)
-
-    creds = {"email": "", "password": "", "save": False}
-
-    tk.Label(dialog, text="ご主人様、情報を入力してねっ！✨", font=("MS Gothic", 14, "bold"), bg=bg_color, fg="#ff69b4").pack(pady=15)
-
-    tk.Label(dialog, text="メールアドレス", bg=bg_color, font=("MS Gothic", 10)).pack()
-    email_entry = tk.Entry(dialog, width=40, font=("Consolas", 10))
-    email_entry.pack(pady=5)
-    
-    # 既存の値をセット（もしあれば）
-    load_dotenv()
-    email_entry.insert(0, os.getenv("NITORI_USERNAME", ""))
-
-    tk.Label(dialog, text="パスワード", bg=bg_color, font=("MS Gothic", 10)).pack()
-    pass_entry = tk.Entry(dialog, width=40, show="*", font=("Consolas", 10))
-    pass_entry.pack(pady=5)
-    pass_entry.insert(0, os.getenv("NITORI_PASSWORD", ""))
-
-    save_var = tk.BooleanVar(value=True)
-    tk.Checkbutton(dialog, text=".envファイルに保存する（次からめっちゃラク！）", variable=save_var, bg=bg_color, activebackground=bg_color, font=("MS Gothic", 9)).pack(pady=10)
-
-    def on_submit():
-        creds["email"] = email_entry.get().strip()
-        creds["password"] = pass_entry.get().strip()
-        creds["save"] = save_var.get()
-        if not creds["email"] or not creds["password"]:
-            messagebox.showwarning("エラー！", "ちゃんと入力してくれないと困っちゃうゾ！💦")
-        else:
-            dialog.destroy()
-
-    btn = tk.Button(dialog, text="これでログイン！🚀", command=on_submit, bg="#ffb6c1", fg="white", font=("MS Gothic", 11, "bold"), width=25, relief="flat", cursor="hand2")
-    btn.pack(pady=20)
-
-    dialog.protocol("WM_DELETE_WINDOW", lambda: root.destroy())
-    dialog.grab_set()
-    root.wait_window(dialog)
-    root.destroy()
-
-    # 保存処理
-    if creds["save"] and creds["email"] and creds["password"]:
-        with open(".env", "w", encoding="utf-8") as f:
-            f.write(f"NITORI_USERNAME={creds['email']}\n")
-            f.write(f"NITORI_PASSWORD={creds['password']}\n")
-            download_dir = os.getenv("DOWNLOAD_DIR", "downloads")
-            f.write(f"DOWNLOAD_DIR={download_dir}\n")
-        print("\n✨ .envファイルに情報を保存したよ！ 次回から起動するだけでOK！")
-
-    return creds["email"], creds["password"]
-
-def login():
-    """セッション（通行証）を優先してログインするよ！パスワード入力は最小限に！✨🎫"""
-    
-    # 1. まずは保存されたセッションがあるかチェック
-    id_token = load_session()
-    if id_token:
-        print("保存されたセッションを発見！ 有効かチェックするね...🔍")
-        if is_token_valid(id_token):
-            print("セッション有効！パスワードなしでログイン成功、さすがご主人様！✨")
-            return id_token
-        else:
-            print("セッションが切れちゃってるみたい。再ログインしよっか！")
-
-    # 2. ダメなら.envやGUIから情報を取得
-    load_dotenv()
-    email = os.getenv("NITORI_USERNAME")
-    password = os.getenv("NITORI_PASSWORD")
-
-    if not email or not password:
-        print("ご主人様、.envファイルが見つからないか、設定が不完全です。\n(.env.sampleをコピーして.envファイルを作成・編集することもできます)")
-        choice = input("今すぐ初期設定を行いますか？ (y/n): ").lower()
-        if choice == 'y':
-            email = input("NITORIのメールアドレスを入力してください: ")
-            password = input("NITORIのパスワードを入力してください: ")
-            download_dir = input("ダウンロード先のフォルダパスを入力してください (デフォルトは 'downloads'): ")
-            if not download_dir:
-                download_dir = "downloads"
-
-            with open('.env', 'w', encoding='utf-8') as f:
-                f.write(f'NITORI_USERNAME="{email}"\n')
-                f.write(f'NITORI_PASSWORD="{password}"\n')
-                f.write(f'DOWNLOAD_DIR="{download_dir}"\n')
-
-            print(".envファイルを作成し、設定を保存しました。ログインを続けます。")
-            # .envファイルが作成されたので、再度読み込む
-            load_dotenv()
-        else:
-            print("設定がキャンセルされました。またね、ご主人様！")
-            return None
-
-    # 3. 実際のAPIにログインしにいく
-    api_key = "AIzaSyDcipyBAbP8FkkMGKYFT80CmlIVzuJTINU"
-    auth_endpoint = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
-
-    payload = {
-        "email": email, "password": password, "returnSecureToken": True,
-        "clientType": "CLIENT_TYPE_WEB",
-        "recaptchaEnforcementState": [{"provider": "EMAIL_PASSWORD_PROVIDER", "enforcementState": "AUDIT"}]
+def get_browser_headers():
+    """HARファイルから魔法のヘッダー（Cookieなど）を盗み出すよ！✨🎭"""
+    har_path = 's-nitori.com.har'
+    headers = {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "origin": "https://s-nitori.com",
+        "referer": "https://s-nitori.com/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+        "x-referer": "https://s-nitori.com"
     }
 
-    try:
-        response = requests.post(auth_endpoint, json=payload, headers={'Content-Type': 'application/json'})
-        response.raise_for_status()
-        data = response.json()
-        if 'idToken' in data:
-            print("ログイン成功！ 新しい公式通行証（トークン）をゲットしたよ！✨")
-            new_token = data['idToken']
-            # セッションを保存しておく
-            save_session(new_token)
-            return new_token
-        else:
-            print(f"ログイン失敗。レスポンスがおかしいみたい。\n{data}")
-            return None
-    except requests.exceptions.HTTPError as e:
-        print(f"ログイン失敗したみたい… status: {e.response.status_code}")
+    if os.path.exists(har_path):
         try:
-            print(f"エラー内容: {e.response.json().get('error', {}).get('message', '不明なエラー')}")
-        except json.JSONDecodeError:
-            print(f"エラー内容: {e.response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"うぅ、リクエスト中にエラーが…: {e}")
-    return None
+            with open(har_path, 'r', encoding='utf-8') as f:
+                har = json.load(f)
+            # galleriesV2のリクエストを探してヘッダーをコピー
+            for entry in har['log']['entries']:
+                if 'galleriesV2' in entry['request'].get('postData', {}).get('text', ''):
+                    for h in entry['request']['headers']:
+                        if not h['name'].startswith(':'):
+                            headers[h['name'].lower()] = h['value']
+                    return headers
+        except:
+            print("HARの解析に失敗しちゃった...デフォルトのヘッダーを使うね！")
+    else:
+        print("s-nitori.com.har が見つからないよ！手動ログインが必要かも？💦")
+        
+    return headers
 
-def get_authed_soup(url, id_token):
-    """Fetches a page with authorization and returns a BeautifulSoup object."""
-    headers = {"Authorization": f"Bearer {id_token}"}
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return BeautifulSoup(response.text, 'lxml')
-    except requests.exceptions.RequestException as e:
-        print(f"ページの取得に失敗しちゃった: {url}, エラー: {e}")
-        return None
-
-def get_all_album_urls(id_token):
-    """Iterates through gallery pages to find all album URLs."""
-    print("アルバムURLの収集を開始しますっ！")
-    base_url = "https://s-nitori.com/"
-    gallery_url_template = "https://s-nitori.com/gallery/pictures?page={}"
-    album_urls = set()
-    page = 1
+def fetch_all_albums_via_api():
+    """APIを自動でページングして、全アルバム情報を根こそぎ取ってくるよ！🚀💎"""
+    print("APIを自動巡回してアルバム情報を収集中...🔍")
+    api_url = "https://api.thefam.jp/graphql"
+    headers = get_browser_headers()
+    
+    all_albums = []
+    offset = 0
+    limit = 12
+    
     while True:
-        print(f"{page}ページ目をチェック中...")
-        soup = get_authed_soup(gallery_url_template.format(page), id_token)
-        if not soup:
-            break
-
-        # アルバムへのリンクは '/gallery/pictures/ランダムな文字列' の形式
-        links = soup.find_all('a', href=re.compile(r'^/gallery/pictures/[a-zA-Z0-9]{20}$'))
+        payload = {
+            "operationName": "galleriesV2",
+            "variables": {
+                "paginationOptions": {"type": "OFFSET", "offsetOptions": {"offset": offset, "limit": limit}},
+                "filterOptions": {"galleryGroupSlug": "pictures"},
+                "sortKey": "PUBLICATION_START_AT"
+            },
+            "query": """query galleriesV2($paginationOptions: PaginationOptionsInput!, $filterOptions: GalleryFilterOptionsInput, $sortKey: GallerySortKey) {
+  galleriesV2(paginationOptions: $paginationOptions, filterOptions: $filterOptions, sortKey: $sortKey) {
+    pageInfo { hasNextPage }
+    edges {
+      node {
+        id
+        name
+        contents {
+          contentFile { url }
+        }
+      }
+    }
+  }
+}"""
+        }
         
-        if not links:
-            print(f"{page}ページにはアルバムが見つかりませんでした。収集を終わります。")
+        try:
+            response = requests.post(api_url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            # エラーチェック
+            if 'errors' in data:
+                print(f"APIエラーが発生しちゃった...😭: {data['errors'][0]['message']}")
+                break
+                
+            nodes = data.get('data', {}).get('galleriesV2', {}).get('edges', [])
+            if not nodes:
+                break
+                
+            for edge in nodes:
+                node = edge['node']
+                album_info = {
+                    "id": node['id'],
+                    "title": re.sub(r'[\\/:*?"<>|]', '_', node['name']),
+                    "image_urls": [c['contentFile']['url'] for c in node.get('contents', []) if c.get('contentFile')]
+                }
+                all_albums.append(album_info)
+            
+            print(f"通算 {len(all_albums)} 件のアルバムを捕捉！🎯")
+            
+            has_next = data.get('data', {}).get('galleriesV2', {}).get('pageInfo', {}).get('hasNextPage', False)
+            if not has_next:
+                print("最後まで読み切ったよ！終了！✨")
+                break
+                
+            offset += limit
+            time.sleep(0.5) # サーバーをいたわる心
+            
+        except Exception as e:
+            print(f"巡回中にトラブル発生！😭: {e}")
             break
+            
+    return all_albums
 
-        found_new = False
-        for link in links:
-            full_url = urljoin(base_url, link['href'])
-            if full_url not in album_urls:
-                album_urls.add(full_url)
-                found_new = True
-        
-        print(f"見つけたアルバム数: {len(links)}")
-        page += 1
-        time.sleep(1) # サーバーに優しくするために少し待つ
-
-    print(f"合計 {len(album_urls)} 件のユニークなアルバムを見つけました！")
-    return sorted(list(album_urls))
-
-def get_album_data(album_url, id_token):
-    """Extracts image URLs and album name from a single album page."""
-    print(f"アルバムページを解析中: {album_url}")
-    soup = get_authed_soup(album_url, id_token)
-    if not soup:
-        return None, None
-
-    # URLの末尾をアルバム名（フォルダ名）として使う
-    album_name = album_url.strip('/').split('/')[-1]
-
-    script_tag = soup.find('script', string=re.compile(r'window\.__NUXT__'))
-    if not script_tag:
-        print("Nuxt.jsのデータスクリプトが見つかりませんでした。")
-        return album_name, []
-
-    script_content = script_tag.string.replace('\\u002F', '/')
-    urls = re.findall(r'"(https://fam-fansite\.imgix\.net/shared_file/.*?)"', script_content)
+def download_images(album, base_path):
+    """一アルバム分をフォルダに保存するね！📁📷"""
+    folder_name = f"{album['id']} - {album['title']}"
+    album_dir = os.path.join(base_path, folder_name)
     
-    image_urls = sorted(list(set(url for url in urls if url.split('?')[0].endswith(('.png', '.jpg', '.jpeg', '.gif')))))
-    
-    print(f"アルバム '{album_name}' で {len(image_urls)} 枚のユニークな画像URLを見つけました。")
-    return album_name, image_urls
-
-def download_album_images(album_name, image_urls, base_save_path):
-    """Downloads images for a specific album into its own folder."""
-    album_dir = os.path.join(base_save_path, album_name)
     if not os.path.exists(album_dir):
         os.makedirs(album_dir)
-        print(f"作成したフォルダ: {album_dir}")
+        print(f"フォルダ作成: {folder_name}")
 
-    for url in image_urls:
+    urls = album['image_urls']
+    if not urls:
+        print(f"『{album['title']}』は空っぽみたい...？")
+        return
+
+    for i, url in enumerate(urls):
         try:
-            image_name = url.split('?')[0].split('/')[-1]
-            file_path = os.path.join(album_dir, image_name)
+            ext = ".jpg"
+            if ".png" in url.lower(): ext = ".png"
+            elif ".gif" in url.lower(): ext = ".gif"
+            
+            filename = f"{i+1:03d}{ext}"
+            file_path = os.path.join(album_dir, filename)
 
             if os.path.exists(file_path):
-                print(f"スキップ: {image_name} はもう存在します。")
                 continue
 
-            print(f"ダウンロード中: {image_name}...")
-            response = requests.get(url, stream=True)
-            response.raise_for_status()
+            print(f"  DL中: {filename}...", end='\r')
+            res = requests.get(url, stream=True, timeout=15)
+            res.raise_for_status()
             with open(file_path, 'wb') as f:
-                for chunk in response.iter_content(8192):
+                for chunk in res.iter_content(8192):
                     f.write(chunk)
-        except requests.exceptions.RequestException as e:
-            print(f"ダウンロードエラー: {url}, エラー: {e}")
-        time.sleep(0.5) # サーバーに優しく
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"\n  失敗: {filename}, エラー: {e}")
+            
+    print(f"\n『{album['title']}』ダウンロード完了！✨")
 
 if __name__ == '__main__':
-    id_token = login()
-    if id_token:
-        load_dotenv()
-        save_path = os.getenv("DOWNLOAD_DIR", "downloads")
+    print("\n" + "💎"*20)
+    print("✨ NITORI 真・全自動ダウンローダー ✨")
+    print("💎"*20 + "\n")
+
+    # 保存先の決定
+    save_path = os.getenv("DOWNLOAD_DIR", "downloads")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # 1. APIを使って全アルバム情報を一気に取得！
+    albums = fetch_all_albums_via_api()
+    
+    if not albums:
+        print("うぅ、アルバムが一件も取れなかったよ...😭 HARファイルが最新か確認してね！")
+    else:
+        # 2. 全画像をダウンロード！
+        total = len(albums)
+        for i, album in enumerate(albums):
+            print(f"\n--- 任務 {i+1}/{total} 開始 ---")
+            download_images(album, save_path)
         
-        # 絶対パスに変換して表示
-        abs_save_path = os.path.abspath(save_path)
-        print(f"画像は '{abs_save_path}' に保存されます。")
-        print("変更したい場合は、.envファイルで 'DOWNLOAD_DIR' を設定してくださいね。")
-
-        if not os.path.exists(abs_save_path):
-            os.makedirs(abs_save_path)
-
-        album_urls = get_all_album_urls(id_token)
-
-        if not album_urls:
-            print("ダウンロード対象のアルバムが見つかりませんでした。しょぼん。")
-        else:
-            total_albums = len(album_urls)
-            for i, album_url in enumerate(album_urls):
-                print(f"\n--- アルバム {i+1}/{total_albums} の処理を開始 ---")
-                album_name, image_urls = get_album_data(album_url, id_token)
-                if album_name and image_urls:
-                    download_album_images(album_name, image_urls, save_path)
-                else:
-                    print(f"アルバム {album_url} から画像を取得できませんでした。")
-            
-            print("\n----------------------------")
-            print("すべてのダウンロード処理が完了しました！ お疲れ様でした、ご主人様！")
+        print("\n" + "="*40)
+        print("ミッション完全コンプリート！ご主人様、お宝ざっくざくだよ！！💕💰💎✨")
+        print("="*40)
