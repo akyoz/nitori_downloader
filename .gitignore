@@ -15,10 +15,13 @@ downloads/*
 
 # 🛡️ 秘匿情報（絶対に公開禁止！）
 session.json
+cookies.txt
+downloader.log
 s-nitori.com.har
 *.har
 *.json_debug
 api_success_headers.json
+analyze_har.py
 
 # 📑 OS・エディタ関連
 .vscode/
