@@ -20,6 +20,9 @@ downloader.log
 s-nitori.com.har
 *.har
 *.json_debug
+api_debug.json
+api_error.json
+api_error_headers.json
 api_success_headers.json
 analyze_har.py
 
